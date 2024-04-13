@@ -19,13 +19,16 @@ struct Node
 class BPlusTree
 {
 private:
-    Node *root; // 根节点指针
-    int d;      // 阶数
-    int hd;     // 分裂时的分割点
-    int hf;     // 删除后节点最小键数量
+    Node *root;    // 根节点指针
+    int d;         // 阶数：非叶节点存储的子节点的最大数量
+    int d2;        // 叶节点最多有d2-1条记录
+    int hd;        // 分裂时叶节点的分割点
+    int hd2;       // 分裂时叶节点的分割点
+    int hf;        // 删除后非叶节点最小键数量
+    int hf2;       // 删除后叶节点最小键数量
 
 public:
-    BPlusTree(int d);
+    BPlusTree(int d, int d2);
 
     int get(int key);
     void insert(int k, int v);

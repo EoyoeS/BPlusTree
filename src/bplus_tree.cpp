@@ -1,6 +1,6 @@
 #include "bplus_tree.hpp"
 
-BPlusTree::BPlusTree(int d) : d(d), hd(d >> 1), hf((d - 1) >> 1), root(nullptr) {}
+BPlusTree::BPlusTree(int d, int d2) : d(d), hd(d >> 1), hf((d - 1) >> 1), d2(d2), hd2(d2 >> 1), hf2((d2 - 1) >> 1), root(nullptr) {}
 
 int BPlusTree::get(int key)
 {
@@ -42,16 +42,16 @@ void BPlusTree::insert(int k, int v)
     }
     node->keys.insert(node->keys.begin() + i, k);
     node->values.insert(node->values.begin() + i, v);
-    if (node->keys.size() < d)
+    if (node->keys.size() < d2)
     {
         return;
     }
     // 叶节点满了
     Node *new_node = new Node(nullptr, true);
-    new_node->keys = std::vector<int>(node->keys.begin() + hd, node->keys.end());
-    new_node->values = std::vector<int>(node->values.begin() + hd, node->values.end());
-    node->keys.erase(node->keys.begin() + hd, node->keys.end());
-    node->values.erase(node->values.begin() + hd, node->values.end());
+    new_node->keys = std::vector<int>(node->keys.begin() + hd2, node->keys.end());
+    new_node->values = std::vector<int>(node->values.begin() + hd2, node->values.end());
+    node->keys.erase(node->keys.begin() + hd2, node->keys.end());
+    node->values.erase(node->values.begin() + hd2, node->values.end());
     _add(node->parent, new_node->keys[0], node, new_node);
 }
 void BPlusTree::remove(int k)
@@ -159,12 +159,12 @@ void BPlusTree::_fix(Node *node)
     {
         parent->keys[j - 1] = node->keys[0];
     }
-    if (node->keys.size() >= hf)
+    if (node->keys.size() >= hf2)
     {
         return;
     }
     // 尝试从右兄弟借一个键
-    if (j < parent->keys.size() && parent->children[j + 1]->keys.size() > hf)
+    if (j < parent->keys.size() && parent->children[j + 1]->keys.size() > hf2)
     {
         Node *sibling = parent->children[j + 1];
         node->keys.push_back(sibling->keys[0]);
@@ -175,7 +175,7 @@ void BPlusTree::_fix(Node *node)
         return;
     }
     // 尝试从左兄弟借一个键
-    if (j > 0 && parent->children[j - 1]->keys.size() > hf)
+    if (j > 0 && parent->children[j - 1]->keys.size() > hf2)
     {
         Node *sibling = parent->children[j - 1];
         node->keys.insert(node->keys.begin(), sibling->keys.back());

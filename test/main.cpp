@@ -3,7 +3,7 @@
 
 int main()
 {
-    BPlusTree tree(5);
+    BPlusTree tree(5, 5);
     for (int i = 0; i < 50; i += 2)
     {
         tree.insert(i, i * i);
