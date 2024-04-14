@@ -1,23 +1,59 @@
 #include <iostream>
 #include "bplus_tree.hpp"
 
+void show_page(BPlusTree &tree)
+{
+    for (page_num_t i = 0; i < tree.cnt; ++i)
+    {
+        Node *look = tree.readNode(i);
+        printf("page %d: pos %d, parent %d, type %d\n", i, look->pos, look->parent, look->is_leaf);
+        printf("keys:");
+        for (size_t j = 0; j < look->keys.size(); ++j)
+        {
+            printf(" %d", look->keys[j]);
+        }
+        printf("\n");
+        if (!look->is_leaf)
+        {
+            printf("children:");
+            for (size_t j = 0; j < look->children.size(); ++j)
+            {
+                printf(" %d", look->children[j]);
+            }
+            printf("\n\n");
+        }
+        else
+        {
+            printf("values:");
+            for (size_t j = 0; j < look->values.size(); ++j)
+            {
+                printf(" %d", look->values[j]);
+            }
+            printf("\n\n");
+        }
+        delete look;
+    }
+}
+
 int main()
 {
-    BPlusTree tree(5, 5);
-    for (int i = 0; i < 50; i += 2)
+    BPlusTree tree("bplus_tree.dat");
+    for (int i = 0; i < 5000; i += 2)
     {
         tree.insert(i, i * i);
     }
-    for (int i = 0; i < 50; i += 3)
+    for (int i = 0; i < 5000; i += 3)
     {
         tree.remove(i);
     }
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i < 5000; ++i)
     {
-        int v = tree.get(i);
+        value_t v = tree.get(i);
         if (v != -1)
         {
-            std::cout << i << ' ' << v << std::endl;
+            printf("(%d, %d)  ", i, v);
         }
     }
+    printf("\n");
+    show_page(tree);
 }

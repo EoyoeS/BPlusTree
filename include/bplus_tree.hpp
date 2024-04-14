@@ -3,43 +3,67 @@
 
 #include <iostream>
 #include <vector>
+#include <fstream>
+
+#define PAGE_SIZE 4096
+#define MAX_INDEX_NUM 100
+#define MAX_DATA_NUM 100
+
+typedef std::int32_t key_t;
+typedef std::int32_t value_t;
+typedef std::int64_t page_num_t;
+typedef std::size_t size_t;
 
 // 节点结构体
 struct Node
 {
-    std::vector<int> keys;        // 键值列表
-    std::vector<int> values;      // 值列表
-    std::vector<Node *> children; // 子节点
-    bool is_leaf;                 // 是否为叶节点
-    Node *parent;                 // 父节点指针
+    std::vector<key_t> keys;          // 键值列表
+    std::vector<value_t> values;      // 值列表
+    std::vector<page_num_t> children; // 子节点
+    bool is_leaf;                     // 是否为叶节点
+    page_num_t pos;                   // 页号
+    page_num_t parent;                // 父节点页号
 
-    Node(Node *parent, bool is_leaf) : parent(parent), is_leaf(is_leaf) {}
+    // Node(page_num_t parent, bool is_leaf) : parent(parent), is_leaf(is_leaf), key_num(0), keys({}), values({}), children({}) {}
+    Node(page_num_t parent, bool is_leaf, page_num_t pos)
+    {
+        this->is_leaf = is_leaf;
+        this->keys = std::vector<key_t>();
+        this->values = std::vector<value_t>();
+        this->children = std::vector<page_num_t>();
+        this->pos = pos;
+        this->parent = parent;
+    }
 };
 
 class BPlusTree
 {
-private:
-    Node *root;    // 根节点指针
-    int d;         // 阶数：非叶节点存储的子节点的最大数量
-    int d2;        // 叶节点最多有d2-1条记录
-    int hd;        // 分裂时叶节点的分割点
-    int hd2;       // 分裂时叶节点的分割点
-    int hf;        // 删除后非叶节点最小键数量
-    int hf2;       // 删除后叶节点最小键数量
-
 public:
-    BPlusTree(int d, int d2);
+    // private:
+    int d;             // 阶数：非叶节点存储的子节点的最大数量
+    int d2;            // 叶节点最多有d2-1条记录
+    int hd;            // 分裂时叶节点的分割点
+    int hd2;           // 分裂时叶节点的分割点
+    int hf;            // 删除后非叶节点最小键数量
+    int hf2;           // 删除后叶节点最小键数量
+    page_num_t root;   // 根节点页号
+    page_num_t cnt;    // 页号计数
+    std::fstream file; // 文件流
 
-    int get(int key);
-    void insert(int k, int v);
-    void remove(int k);
+    BPlusTree(const std::string &file_path);
 
-private:
-    Node *_search(int k);
-    void _split(Node *node);
-    void _add(Node *parent, int k, Node *l, Node *r);
+    value_t get(key_t key);
+    void insert(key_t k, value_t v);
+    void remove(key_t k);
+
+    // private:
+    Node *_search(key_t k);
+    void _add(page_num_t parent, key_t k, Node *node, Node *new_node);
+    void _split(Node *pos);
     void _fix(Node *node);
-    void _merge(Node *node);
+    void _merge(Node *pos);
+    Node *readNode(page_num_t pos);
+    void writeNode(Node *node);
 };
 
 #endif
