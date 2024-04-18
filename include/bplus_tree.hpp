@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <memory>
 
 #define PAGE_SIZE 4096
 #define MAX_INDEX_NUM 100
@@ -24,7 +25,6 @@ struct Node
     page_num_t pos;                   // 页号
     page_num_t parent;                // 父节点页号
 
-    // Node(page_num_t parent, bool is_leaf) : parent(parent), is_leaf(is_leaf), key_num(0), keys({}), values({}), children({}) {}
     Node(page_num_t parent, bool is_leaf, page_num_t pos)
     {
         this->is_leaf = is_leaf;
@@ -39,7 +39,6 @@ struct Node
 class BPlusTree
 {
 public:
-    // private:
     int d;             // 阶数：非叶节点存储的子节点的最大数量
     int d2;            // 叶节点最多有d2-1条记录
     int hd;            // 分裂时叶节点的分割点
@@ -50,20 +49,19 @@ public:
     page_num_t cnt;    // 页号计数
     std::fstream file; // 文件流
 
-    BPlusTree(const std::string &file_path);
+    explicit BPlusTree(const std::string &file_path);
 
     value_t get(key_t key);
     void insert(key_t k, value_t v);
     void remove(key_t k);
+    std::unique_ptr<Node> readNode(page_num_t pos);
 
-    // private:
-    Node *_search(key_t k);
-    void _add(page_num_t parent, key_t k, Node *node, Node *new_node);
-    void _split(Node *pos);
-    void _fix(Node *node);
-    void _merge(Node *pos);
-    Node *readNode(page_num_t pos);
-    void writeNode(Node *node);
+private:
+    std::unique_ptr<Node> _search(key_t k);
+    void _add(page_num_t parent, key_t k, std::unique_ptr<Node> &node, std::unique_ptr<Node> &new_node);
+    void _split(std::unique_ptr<Node> &pos);
+    void _fix(std::unique_ptr<Node> &node);
+    void _merge(std::unique_ptr<Node> &pos);
+    void writeNode(std::unique_ptr<Node> &node);
 };
-
 #endif

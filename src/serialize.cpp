@@ -1,9 +1,8 @@
-#include <fstream>
 #include <cstring>
 
 #include "bplus_tree.hpp"
 
-void BPlusTree::writeNode(Node *node)
+void BPlusTree::writeNode(std::unique_ptr<Node> &node)
 {
     char *buffer = new char[PAGE_SIZE];
     size_t offset = 0;
@@ -41,10 +40,9 @@ void BPlusTree::writeNode(Node *node)
     file.write(buffer, PAGE_SIZE);
     file.flush();
     delete[] buffer;
-    delete node;
 }
 
-Node *BPlusTree::readNode(page_num_t pos)
+std::unique_ptr<Node> BPlusTree::readNode(page_num_t pos)
 {
     char *buffer = new char[PAGE_SIZE];
     file.seekg(pos * PAGE_SIZE);
@@ -59,7 +57,7 @@ Node *BPlusTree::readNode(page_num_t pos)
     offset += sizeof(page_num_t);
     memcpy((char *)&parent, buffer + offset, sizeof(page_num_t));
     offset += sizeof(page_num_t);
-    Node *node = new Node(parent, is_leaf, pos);
+    std::unique_ptr<Node> node(new Node(parent, is_leaf, pos));
     memcpy((char *)&key_num, buffer + offset, sizeof(size_t));
     offset += sizeof(size_t);
     node->keys.resize(key_num);
