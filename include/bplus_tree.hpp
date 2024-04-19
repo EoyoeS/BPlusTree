@@ -50,7 +50,7 @@ public:
     page_num_t cnt;    // 页号计数
     std::fstream file; // 文件流
 
-    explicit BPlusTree(const std::string &file_path);
+    explicit BPlusTree(const std::string &file_path, bool read = false);
 
     value_t get(key_t key);
     void insert(key_t k, value_t v);

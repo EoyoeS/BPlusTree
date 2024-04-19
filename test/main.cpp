@@ -3,7 +3,8 @@
 
 void show_page(BPlusTree &tree)
 {
-    for (page_num_t i = 0; i < tree.cnt; ++i)
+    printf("root: %ld\n", tree.root);
+    for (page_num_t i = 1; i < tree.cnt; ++i)
     {
         auto look = tree.readNode(i);
         printf("page %ld: pos %ld, parent %ld, type %d\n", i, look->pos, look->parent, look->is_leaf);
@@ -36,7 +37,7 @@ void show_page(BPlusTree &tree)
 
 int main()
 {
-    BPlusTree tree("bplus_tree.dat");
+    BPlusTree tree("/dev/sfdv0n1");
     for (int i = 0; i < 5000; i += 2)
     {
         tree.insert(i, i * i);

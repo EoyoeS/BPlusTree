@@ -2,16 +2,16 @@
 
 #include "bplus_tree.hpp"
 
-BPlusTree::BPlusTree(const std::string &file_path)
+BPlusTree::BPlusTree(const std::string &file_path, bool reset)
 {
-    if (!std::filesystem::exists(file_path))
+    if (reset || !std::filesystem::exists(file_path))
     {
         std::ofstream _file(file_path);
         _file.close();
         this->max_index = MAX_INDEX_NUM;
         this->max_data = MAX_DATA_NUM;
         this->root = 0;
-        this->cnt = 0;
+        this->cnt = 1;
         this->file = std::fstream(file_path, std::ios::binary | std::ios::in | std::ios::out);
         if (!this->file.is_open())
         {
