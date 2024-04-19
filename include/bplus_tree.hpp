@@ -7,13 +7,14 @@
 #include <memory>
 
 #define PAGE_SIZE 4096
-#define MAX_INDEX_NUM 100
-#define MAX_DATA_NUM 100
 
 typedef std::int32_t key_t;
 typedef std::int32_t value_t;
 typedef std::int64_t page_num_t;
 typedef std::size_t size_t;
+
+const std::int32_t MAX_INDEX_NUM = (PAGE_SIZE - sizeof(bool) - sizeof(page_num_t) - sizeof(page_num_t) - sizeof(size_t)) / (sizeof(key_t) + sizeof(page_num_t));
+const std::int32_t MAX_DATA_NUM = (PAGE_SIZE - sizeof(bool) - sizeof(page_num_t) - sizeof(page_num_t) - sizeof(size_t)) / (sizeof(key_t) + sizeof(value_t)) + 1;
 
 // 节点结构体
 struct Node
@@ -39,12 +40,12 @@ struct Node
 class BPlusTree
 {
 public:
-    int d;             // 阶数：非叶节点存储的子节点的最大数量
-    int d2;            // 叶节点最多有d2-1条记录
-    int hd;            // 分裂时叶节点的分割点
-    int hd2;           // 分裂时叶节点的分割点
-    int hf;            // 删除后非叶节点最小键数量
-    int hf2;           // 删除后叶节点最小键数量
+    std::int32_t max_index;     // 阶数：非叶节点存储的子节点的最大数量
+    std::int32_t max_data;      // 叶节点最多有d2-1条记录
+    std::int32_t mid_indx;      // 分裂时叶节点的分割点
+    std::int32_t mid_data;      // 分裂时叶节点的分割点
+    std::int32_t half_index;    // 删除后非叶节点最小键数量
+    std::int32_t half_data;     // 删除后叶节点最小键数量
     page_num_t root;   // 根节点页号
     page_num_t cnt;    // 页号计数
     std::fstream file; // 文件流
@@ -63,5 +64,7 @@ private:
     void _fix(std::unique_ptr<Node> &node);
     void _merge(std::unique_ptr<Node> &pos);
     void writeNode(std::unique_ptr<Node> &node);
+    void _read();
+    void _write();
 };
 #endif

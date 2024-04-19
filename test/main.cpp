@@ -6,7 +6,7 @@ void show_page(BPlusTree &tree)
     for (page_num_t i = 0; i < tree.cnt; ++i)
     {
         auto look = tree.readNode(i);
-        printf("page %d: pos %d, parent %d, type %d\n", i, look->pos, look->parent, look->is_leaf);
+        printf("page %ld: pos %ld, parent %ld, type %d\n", i, look->pos, look->parent, look->is_leaf);
         printf("keys:");
         for (size_t j = 0; j < look->keys.size(); ++j)
         {
@@ -18,7 +18,7 @@ void show_page(BPlusTree &tree)
             printf("children:");
             for (size_t j = 0; j < look->children.size(); ++j)
             {
-                printf(" %d", look->children[j]);
+                printf(" %ld", look->children[j]);
             }
             printf("\n\n");
         }

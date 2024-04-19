@@ -88,3 +88,38 @@ std::unique_ptr<Node> BPlusTree::readNode(page_num_t pos)
     delete[] buffer;
     return node;
 }
+
+void BPlusTree::_write()
+{
+    char *buffer = new char[PAGE_SIZE];
+    size_t offset = 0;
+    memcpy(buffer + offset, (char *)&max_index, sizeof(int32_t));
+    offset += sizeof(int32_t);
+    memcpy(buffer + offset, (char *)&max_data, sizeof(int32_t));
+    offset += sizeof(int32_t);
+    memcpy(buffer + offset, (char *)&root, sizeof(page_num_t));
+    offset += sizeof(page_num_t);
+    memcpy(buffer + offset, (char *)&cnt, sizeof(page_num_t));
+    offset += sizeof(page_num_t);
+    file.seekp(0);
+    file.write(buffer, PAGE_SIZE);
+    file.flush();
+    delete[] buffer;
+}
+
+void BPlusTree::_read()
+{
+    char *buffer = new char[PAGE_SIZE];
+    file.seekg(0);
+    file.read(buffer, PAGE_SIZE);
+    size_t offset = 0;
+    memcpy((char *)&this->max_index, buffer + offset, sizeof(int32_t));
+    offset += sizeof(int32_t);
+    memcpy((char *)&this->max_data, buffer + offset, sizeof(int32_t));
+    offset += sizeof(int32_t);
+    memcpy((char *)&this->root, buffer + offset, sizeof(page_num_t));
+    offset += sizeof(page_num_t);
+    memcpy((char *)&this->cnt, buffer + offset, sizeof(page_num_t));
+    offset += sizeof(page_num_t);
+    delete[] buffer;
+}
