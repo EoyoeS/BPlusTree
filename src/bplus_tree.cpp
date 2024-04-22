@@ -58,7 +58,7 @@ void BPlusTree::insert(key_t k, value_t v)
         std::unique_ptr<Node> root_node(new Node(0, true, cnt++));
         root = root_node->pos;
         _write();
-        writeNode(root_node);
+        write_node(root_node);
     }
     auto node = _search(k);
     size_t i = 0;
@@ -78,7 +78,7 @@ void BPlusTree::insert(key_t k, value_t v)
     node->values.insert(node->values.begin() + i, v);
     if (node->keys.size() < max_data)
     {
-        writeNode(node);
+        write_node(node);
         return;
     }
     // 叶节点满了
@@ -117,7 +117,7 @@ void BPlusTree::remove(key_t k)
         }
         else
         {
-            writeNode(node);
+            write_node(node);
         }
         return;
     }
@@ -127,13 +127,13 @@ void BPlusTree::remove(key_t k)
 std::unique_ptr<Node> BPlusTree::_search(key_t k)
 {
     // 返回可能包含 k 的叶节点
-    auto node = readNode(root);
+    auto node = read_node(root);
     while (!node->is_leaf)
     {
         size_t i = 0;
         for (; i < node->keys.size() && k >= node->keys[i]; ++i)
             ;
-        node = readNode(node->children[i]);
+        node = read_node(node->children[i]);
     }
     return node;
 }
@@ -153,7 +153,7 @@ void BPlusTree::_add(page_num_t parent, key_t k, std::unique_ptr<Node> &node, st
     }
     else
     {
-        parent_node = readNode(parent);
+        parent_node = read_node(parent);
     }
     size_t i = 0;
     for (; i < parent_node->keys.size() && k > parent_node->keys[i]; ++i)
@@ -161,11 +161,11 @@ void BPlusTree::_add(page_num_t parent, key_t k, std::unique_ptr<Node> &node, st
     parent_node->keys.insert(parent_node->keys.begin() + i, k);
     parent_node->children.insert(parent_node->children.begin() + i + 1, new_node->pos);
     new_node->parent = parent_node->pos;
-    writeNode(node);
-    writeNode(new_node);
+    write_node(node);
+    write_node(new_node);
     if (parent_node->keys.size() < max_index)
     {
-        writeNode(parent_node);
+        write_node(parent_node);
         return;
     }
     _split(parent_node);
@@ -183,9 +183,9 @@ void BPlusTree::_split(std::unique_ptr<Node> &node)
     node->children.erase(node->children.begin() + mid_indx + 1, node->children.end());
     for (page_num_t child : new_node->children)
     {
-        auto child_node = readNode(child);
+        auto child_node = read_node(child);
         child_node->parent = new_node->pos;
-        writeNode(child_node);
+        write_node(child_node);
     }
     _add(node->parent, k, node, new_node);
 }
@@ -193,7 +193,7 @@ void BPlusTree::_split(std::unique_ptr<Node> &node)
 void BPlusTree::_fix(std::unique_ptr<Node> &node)
 {
     // 修复删除后的叶节点
-    auto parent_node = readNode(node->parent);
+    auto parent_node = read_node(node->parent);
     int j = 0;
     for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
         ;
@@ -204,15 +204,15 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
     }
     if (node->keys.size() >= half_data)
     {
-        writeNode(node);
-        writeNode(parent_node);
+        write_node(node);
+        write_node(parent_node);
         return;
     }
     // 尝试从右兄弟借一个键
     std::unique_ptr<Node> r_sibling = nullptr;
     if (j < parent_node->keys.size())
     {
-        r_sibling = readNode(parent_node->children[j + 1]);
+        r_sibling = read_node(parent_node->children[j + 1]);
         if (r_sibling->keys.size() > half_data)
         {
             node->keys.push_back(r_sibling->keys[0]);
@@ -220,9 +220,9 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
             r_sibling->keys.erase(r_sibling->keys.begin());
             r_sibling->values.erase(r_sibling->values.begin());
             parent_node->keys[j] = r_sibling->keys[0];
-            writeNode(node);
-            writeNode(r_sibling);
-            writeNode(parent_node);
+            write_node(node);
+            write_node(r_sibling);
+            write_node(parent_node);
             return;
         }
     }
@@ -230,7 +230,7 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
     std::unique_ptr<Node> l_sibling = nullptr;
     if (j > 0)
     {
-        l_sibling = readNode(parent_node->children[j - 1]);
+        l_sibling = read_node(parent_node->children[j - 1]);
         if (l_sibling->keys.size() > half_data)
         {
             node->keys.insert(node->keys.begin(), l_sibling->keys.back());
@@ -238,9 +238,9 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
             l_sibling->keys.pop_back();
             l_sibling->values.pop_back();
             parent_node->keys[j - 1] = node->keys[0];
-            writeNode(node);
-            writeNode(l_sibling);
-            writeNode(parent_node);
+            write_node(node);
+            write_node(l_sibling);
+            write_node(parent_node);
             return;
         }
     }
@@ -273,12 +273,12 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
         }
         else
         {
-            writeNode(parent_node);
+            write_node(parent_node);
         }
-        writeNode(left);
+        write_node(left);
         return;
     }
-    writeNode(left);
+    write_node(left);
     if (parent_node->keys.size() < half_index)
     {
         _merge(parent_node);
@@ -287,7 +287,7 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
 void BPlusTree::_merge(std::unique_ptr<Node> &node)
 {
     // 合并非叶节点
-    auto parent_node = readNode(node->parent);
+    auto parent_node = read_node(node->parent);
     int j = 0;
     for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
         ;
@@ -295,7 +295,7 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
     std::unique_ptr<Node> r_sibling = nullptr;
     if (j < parent_node->keys.size())
     {
-        r_sibling = readNode(parent_node->children[j + 1]);
+        r_sibling = read_node(parent_node->children[j + 1]);
         if (r_sibling->keys.size() > half_index)
         {
             node->keys.push_back(r_sibling->keys[0]);
@@ -303,9 +303,9 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
             r_sibling->keys.erase(r_sibling->keys.begin());
             r_sibling->children.erase(r_sibling->children.begin());
             parent_node->keys[j] = r_sibling->keys[0];
-            writeNode(node);
-            writeNode(r_sibling);
-            writeNode(parent_node);
+            write_node(node);
+            write_node(r_sibling);
+            write_node(parent_node);
             return;
         }
     }
@@ -313,7 +313,7 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
     std::unique_ptr<Node> l_sibling = nullptr;
     if (j > 0)
     {
-        l_sibling = readNode(parent_node->children[j - 1]);
+        l_sibling = read_node(parent_node->children[j - 1]);
         if (l_sibling->keys.size() > half_index)
         {
             node->keys.insert(node->keys.begin(), l_sibling->keys.back());
@@ -321,9 +321,9 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
             l_sibling->keys.pop_back();
             l_sibling->values.pop_back();
             parent_node->keys[j - 1] = node->keys[0];
-            writeNode(node);
-            writeNode(l_sibling);
-            writeNode(parent_node);
+            write_node(node);
+            write_node(l_sibling);
+            write_node(parent_node);
             return;
         }
     }
@@ -346,9 +346,9 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
     left->children.insert(left->children.end(), right->children.begin(), right->children.end());
     for (page_num_t child : right->children)
     {
-        auto child_node = readNode(child);
+        auto child_node = read_node(child);
         child_node->parent = left->pos;
-        writeNode(child_node);
+        write_node(child_node);
     }
     parent_node->keys.erase(parent_node->keys.begin() + left_j);
     parent_node->children.erase(parent_node->children.begin() + left_j + 1);
@@ -362,15 +362,15 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
         }
         else
         {
-            writeNode(parent_node);
+            write_node(parent_node);
         }
-        writeNode(left);
+        write_node(left);
         return;
     }
-    writeNode(left);
+    write_node(left);
     if (parent_node->keys.size() < half_index)
     {
         _merge(parent_node);
     }
-    writeNode(parent_node);
+    write_node(parent_node);
 }
