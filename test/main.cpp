@@ -1,6 +1,8 @@
 #include <cstring>
-#include <chrono>
 #include "bplus_tree.hpp"
+
+const std::string PATH = "/home/wuhepei/biyeueji/mount_sfdv/rocksdb_tmp";
+
 
 void show_page(BPlusTree &tree)
 {
@@ -29,7 +31,7 @@ void show_page(BPlusTree &tree)
             printf("values:");
             for (size_t j = 0; j < look->values.size(); ++j)
             {
-                printf(" %d", look->values[j]);
+                printf(" %ld", look->values[j]);
             }
             printf("\n\n");
         }
@@ -38,26 +40,31 @@ void show_page(BPlusTree &tree)
 
 int main(int argc, char *argv[])
 {
-    BPlusTree tree("/dev/sfdv0n1", argc == 2 && strcmp(argv[1], "reset") == 0);
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 5000; i += 2)
+    BPlusTree tree(PATH, true);
+    for (int i = 0; i < 1000000; i += 2)
     {
-        tree.insert(i, i * i);
+        tree.insert(i, i << 1);
+        // if (tree.cache.size() > 1000)
+        {
+            tree.flush();
+        }
     }
-    for (int i = 0; i < 5000; i += 3)
-    {
-        tree.remove(i);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration = end - start;
-    auto k = duration.count();
-    printf("cost %.2f ms\n", k);
-    // for (int i = 0; i < 5000; ++i)
+    tree.flush();
+    auto node = tree.read_node(tree.root);
+    // for (int i = 0; i < 100000; i += 3)
+    // {
+    //     tree.remove(i);
+    // }
+    // tree.file.seekp(PAGE_SIZE);
+    // tree.file.write(tree._buffer, tree.cnt * PAGE_SIZE);
+    // tree.file.flush();
+    printf("cost %.2f ms\n", tree.cost_time);
+    // for (int i = 97918; i < 98099; ++i)
     // {
     //     value_t v = tree.get(i);
     //     if (v != -1)
     //     {
-    //         printf("(%d, %d)  ", i, v);
+    //         printf("(%d, %ld)  ", i, v);
     //     }
     // }
     // printf("\n");

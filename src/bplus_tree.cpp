@@ -1,10 +1,10 @@
-#include <filesystem>
+#include <cstring>
 
 #include "bplus_tree.hpp"
 
 BPlusTree::BPlusTree(const std::string &file_path, bool reset)
 {
-    if (reset || !std::filesystem::exists(file_path))
+    if (reset)
     {
         std::ofstream _file(file_path);
         _file.close();
@@ -17,7 +17,7 @@ BPlusTree::BPlusTree(const std::string &file_path, bool reset)
         {
             throw std::runtime_error("Error opening file.");
         }
-        _write();
+        // _write();
     }
     else
     {
@@ -28,10 +28,14 @@ BPlusTree::BPlusTree(const std::string &file_path, bool reset)
         }
         _read();
     }
+    this->file_path = file_path;
     this->mid_indx = max_index >> 1;
     this->mid_data = max_data >> 1;
     this->half_index = (max_index - 1) >> 1;
     this->half_data = (max_data - 1) >> 1;
+    this->cache = std::unordered_map<page_num_t, std::unique_ptr<Node>>();
+    this->to_write = std::unordered_set<page_num_t>();
+    this->cost_time = 0;
 }
 
 value_t BPlusTree::get(key_t key)
@@ -57,7 +61,7 @@ void BPlusTree::insert(key_t k, value_t v)
     {
         std::unique_ptr<Node> root_node(new Node(0, true, cnt++));
         root = root_node->pos;
-        _write();
+        // _write();
         write_node(root_node);
     }
     auto node = _search(k);
@@ -83,7 +87,7 @@ void BPlusTree::insert(key_t k, value_t v)
     }
     // 叶节点满了
     std::unique_ptr<Node> new_node(new Node(node->parent, true, cnt++));
-    _write();
+    // _write();
     new_node->keys = std::vector<key_t>(node->keys.begin() + mid_data, node->keys.end());
     new_node->values = std::vector<value_t>(node->values.begin() + mid_data, node->values.end());
     node->keys.erase(node->keys.begin() + mid_data, node->keys.begin() + max_data);
@@ -113,7 +117,7 @@ void BPlusTree::remove(key_t k)
         if (node->keys.empty())
         {
             root = 0;
-            _write();
+            // _write();
         }
         else
         {
@@ -147,7 +151,7 @@ void BPlusTree::_add(page_num_t parent, key_t k, std::unique_ptr<Node> &node, st
         // 根节点满了，分裂
         parent_node = std::unique_ptr<Node>(new Node(0, false, cnt++));
         root = parent_node->pos;
-        _write();
+        // _write();
         parent_node->children.push_back(node->pos);
         node->parent = parent_node->pos;
     }
@@ -175,7 +179,7 @@ void BPlusTree::_split(std::unique_ptr<Node> &node)
 {
     // 分裂非叶节点
     std::unique_ptr<Node> new_node(new Node(node->parent, node->is_leaf, cnt++));
-    _write();
+    // _write();
     new_node->keys = std::vector<key_t>(node->keys.begin() + mid_indx + 1, node->keys.end());
     new_node->children = std::vector<page_num_t>(node->children.begin() + mid_indx + 1, node->children.end());
     key_t k = node->keys[mid_indx];
@@ -268,7 +272,7 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
         if (parent_node->keys.empty())
         {
             root = left->pos;
-            _write();
+            // _write();
             left->parent = 0;
         }
         else
@@ -358,7 +362,7 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
         {
             root = left->pos;
             left->parent = 0;
-            _write();
+            // _write();
         }
         else
         {

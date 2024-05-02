@@ -1,4 +1,5 @@
 #include <cstring>
+#include <chrono>
 
 #include "bplus_tree.hpp"
 
@@ -14,6 +15,7 @@ void to_buffer(char *buffer, std::unique_ptr<Node> &node)
     size_t key_num = node->keys.size();
     memcpy(buffer + offset, (char *)&key_num, sizeof(size_t));
     offset += sizeof(size_t);
+    size_t offset_ = offset;
     for (key_t key : node->keys)
     {
         memcpy(buffer + offset, (char *)&key, sizeof(key_t));
@@ -21,30 +23,28 @@ void to_buffer(char *buffer, std::unique_ptr<Node> &node)
     }
     if (!node->is_leaf)
     {
+        offset_ += MAX_INDEX_NUM * sizeof(key_t);
         for (value_t child : node->children)
         {
-            memcpy(buffer + offset, (char *)&child, sizeof(value_t));
-            offset += sizeof(value_t);
+            memcpy(buffer + offset_, (char *)&child, sizeof(value_t));
+            offset_ += sizeof(value_t);
         }
     }
     else
     {
+        offset_ += MAX_DATA_NUM * sizeof(key_t);
         for (value_t value : node->values)
         {
-            memcpy(buffer + offset, (char *)&value, sizeof(value_t));
-            offset += sizeof(value_t);
+            memcpy(buffer + offset_, (char *)&value, sizeof(value_t));
+            offset_ += sizeof(value_t);
         }
     }
 }
 
 void BPlusTree::write_node(std::unique_ptr<Node> &node)
 {
-    // char buffer_in_mem[PAGE_SIZE];
-    // to_buffer(buffer_in_mem, node);
-    // file.seekp(node->pos * PAGE_SIZE);
-    // file.write(buffer_in_mem, PAGE_SIZE);
-    // file.flush();
-    write_node_with_logging(node);
+    cache[node->pos] = std::make_unique<Node>(*node);
+    to_write.insert(node->pos);
 }
 
 void BPlusTree::write_node_with_logging(std::unique_ptr<Node> &node)
@@ -56,38 +56,37 @@ void BPlusTree::write_node_with_logging(std::unique_ptr<Node> &node)
     memset(buffer_logging, 0, LOGGING_SIZE);
     to_buffer(buffer_in_mem, node);
     file.seekg(0, std::ios::end);
-    if (node->pos * NODE_SIZE == file.tellg())
+    if (node->pos * NODE_SIZE >= file.tellg())
     {
-        file.seekp(0, std::ios::end);
+        file.seekp(node->pos * NODE_SIZE);
         file.write(buffer_in_mem, PAGE_SIZE);
         file.write(buffer_logging, LOGGING_SIZE);
-        file.flush();
+        auto end = std::chrono::high_resolution_clock::now();
         return;
     }
     file.seekg(node->pos * NODE_SIZE);
     file.read(buffer_page, PAGE_SIZE);
-    for (int i = 0, j = 0, t = 0, s = 0; i < K; ++i, s += D)
+    for (int i = 0, t = 0, s = 0; i < K; ++i, s += D)
     {
         if (memcmp(buffer_page + s, buffer_in_mem + s, D) != 0)
         {
-            if (j == T)
+            if (t == T)
             {
                 file.seekp(node->pos * NODE_SIZE);
                 file.write(buffer_in_mem, PAGE_SIZE);
                 memset(buffer_logging, 0, LOGGING_SIZE);
                 file.write(buffer_logging, LOGGING_SIZE);
-                file.flush();
+                auto end = std::chrono::high_resolution_clock::now();
                 return;
             }
             memcpy(buffer_logging + F_SIZE + t, buffer_in_mem + s, D);
             t += D;
-            ++j;
             buffer_logging[i / 8] |= 1 << (i % 8);
         }
     }
     file.seekp(node->pos * NODE_SIZE + PAGE_SIZE);
     file.write(buffer_logging, LOGGING_SIZE);
-    file.flush();
+    auto end = std::chrono::high_resolution_clock::now();
 }
 
 std::unique_ptr<Node> to_node(char *buffer)
@@ -105,29 +104,32 @@ std::unique_ptr<Node> to_node(char *buffer)
     std::unique_ptr<Node> node(new Node(parent, is_leaf, pos));
     memcpy((char *)&key_num, buffer + offset, sizeof(size_t));
     offset += sizeof(size_t);
+    size_t offset_ = offset;
     node->keys.resize(key_num);
     for (int i = 0; i < key_num; ++i)
     {
         memcpy((char *)&node->keys[i], buffer + offset, sizeof(key_t));
         offset += sizeof(key_t);
     }
-    if (!node->is_leaf)
+    if (!is_leaf)
     {
+        offset_ += MAX_INDEX_NUM * sizeof(key_t);
         size_t child_num = key_num + 1;
         node->children.resize(child_num);
         for (int i = 0; i < node->children.size(); ++i)
         {
-            memcpy((char *)&node->children[i], buffer + offset, sizeof(value_t));
-            offset += sizeof(value_t);
+            memcpy((char *)&node->children[i], buffer + offset_, sizeof(value_t));
+            offset_ += sizeof(value_t);
         }
     }
     else
     {
+        offset_ += MAX_DATA_NUM * sizeof(key_t);
         node->values.resize(key_num);
         for (int i = 0; i < key_num; ++i)
         {
-            memcpy((char *)&node->values[i], buffer + offset, sizeof(value_t));
-            offset += sizeof(value_t);
+            memcpy((char *)&node->values[i], buffer + offset_, sizeof(value_t));
+            offset_ += sizeof(value_t);
         }
     }
     return node;
@@ -135,11 +137,16 @@ std::unique_ptr<Node> to_node(char *buffer)
 
 std::unique_ptr<Node> BPlusTree::read_node(page_num_t pos)
 {
-    // char buffer[PAGE_SIZE];
-    // file.seekg(pos * PAGE_SIZE);
-    // file.read(buffer, PAGE_SIZE);
-    // return to_node(buffer);
-    return read_node_with_logging(pos);
+    if (cache.find(pos) != cache.end())
+    {
+        return std::make_unique<Node>(*cache[pos]);
+    }
+    char buffer[PAGE_SIZE];
+    file.seekg(pos * PAGE_SIZE);
+    file.read(buffer, PAGE_SIZE);
+    cache[pos] = to_node(buffer);
+    // cache[pos] = read_node_with_logging(pos);
+    return std::make_unique<Node>(*cache[pos]);
 }
 
 std::unique_ptr<Node> BPlusTree::read_node_with_logging(page_num_t pos)
@@ -161,7 +168,7 @@ std::unique_ptr<Node> BPlusTree::read_node_with_logging(page_num_t pos)
 
 void BPlusTree::_write()
 {
-    char buffer[NODE_SIZE];
+    char buffer[PAGE_SIZE];
     size_t offset = 0;
     memcpy(buffer + offset, (char *)&max_index, sizeof(int32_t));
     offset += sizeof(int32_t);
@@ -172,15 +179,15 @@ void BPlusTree::_write()
     memcpy(buffer + offset, (char *)&cnt, sizeof(page_num_t));
     offset += sizeof(page_num_t);
     file.seekp(0);
-    file.write(buffer, NODE_SIZE);
+    file.write(buffer, PAGE_SIZE);
     file.flush();
 }
 
 void BPlusTree::_read()
 {
-    char buffer[NODE_SIZE];
+    char buffer[PAGE_SIZE];
     file.seekg(0);
-    file.read(buffer, NODE_SIZE);
+    file.read(buffer, PAGE_SIZE);
     size_t offset = 0;
     memcpy((char *)&this->max_index, buffer + offset, sizeof(int32_t));
     offset += sizeof(int32_t);
@@ -190,4 +197,30 @@ void BPlusTree::_read()
     offset += sizeof(page_num_t);
     memcpy((char *)&this->cnt, buffer + offset, sizeof(page_num_t));
     offset += sizeof(page_num_t);
+}
+
+void BPlusTree::flush_node(std::unique_ptr<Node> node)
+{
+    char buffer_in_mem[PAGE_SIZE];
+    to_buffer(buffer_in_mem, node);
+    file.seekp(node->pos * PAGE_SIZE);
+    file.write(buffer_in_mem, PAGE_SIZE);
+    // write_node_with_logging(node);
+}
+
+void BPlusTree::flush()
+{
+    for (page_num_t pos : to_write)
+    {
+        flush_node(std::move(cache[pos]));
+        cache.erase(pos);
+    }
+    to_write.clear();
+    cache.clear();
+    auto start = std::chrono::high_resolution_clock::now();
+    file.flush();
+    _write();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    cost_time += duration.count();
 }

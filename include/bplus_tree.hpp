@@ -3,22 +3,25 @@
 
 #include <iostream>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 #include <fstream>
 #include <memory>
 
 typedef std::int32_t key_t;
-typedef std::int32_t value_t;
+typedef std::int64_t value_t;
 typedef std::int64_t page_num_t;
 typedef std::size_t size_t;
 
 const std::int32_t PAGE_SIZE = 16384;
+// const std::int32_t PAGE_SIZE = 8192;
 const std::int32_t LOGGING_SIZE = 4096;
 const std::int32_t NODE_SIZE = PAGE_SIZE + LOGGING_SIZE;
-const std::int32_t K = 1024;                          // 将l_pg分为K段，K需被8整除
+const std::int32_t K = 64;                            // 将l_pg分为K段，K需被8整除
 const std::int32_t F_SIZE = K / 8;                    // f向量的大小
 const std::int32_t DELTA_OFFSET = PAGE_SIZE + F_SIZE; // ∆的偏移量
 const std::int32_t D = PAGE_SIZE / K;                 // 每段的大小
-const std::int32_t T = 200;                           // 当|∆|>T时，刷新page，最大T=(LOGGING_SIZE-K/8)/D
+const std::int32_t T = 2048;                          // 当|∆|>T时，刷新page，最大T=(LOGGING_SIZE-K/8)/D
 
 const std::int32_t MAX_INDEX_NUM = (PAGE_SIZE - sizeof(bool) - sizeof(page_num_t) - sizeof(page_num_t) - sizeof(size_t)) / (sizeof(key_t) + sizeof(page_num_t));
 const std::int32_t MAX_DATA_NUM = (PAGE_SIZE - sizeof(bool) - sizeof(page_num_t) - sizeof(page_num_t) - sizeof(size_t)) / (sizeof(key_t) + sizeof(value_t)) + 1;
@@ -55,7 +58,12 @@ public:
     std::int32_t half_data;  // 删除后叶节点最小键数量
     page_num_t root;         // 根节点页号
     page_num_t cnt;          // 页号计数
+    std::string file_path;   // 文件路径
     std::fstream file;       // 文件流
+    // char _buffer[4 * 1024 * 1024]; // 缓冲区
+    std::unordered_map<page_num_t, std::unique_ptr<Node>> cache; // 缓存
+    std::unordered_set<page_num_t> to_write;                     // 待写入的节点
+    double cost_time;
 
     explicit BPlusTree(const std::string &file_path, bool read = false);
 
@@ -63,6 +71,7 @@ public:
     void insert(key_t k, value_t v);
     void remove(key_t k);
     std::unique_ptr<Node> read_node(page_num_t pos);
+    void flush();
 
 private:
     std::unique_ptr<Node> _search(key_t k);
@@ -71,6 +80,7 @@ private:
     void _fix(std::unique_ptr<Node> &node);
     void _merge(std::unique_ptr<Node> &pos);
     void write_node(std::unique_ptr<Node> &node);
+    void flush_node(std::unique_ptr<Node> node);
     void write_node_with_logging(std::unique_ptr<Node> &node);
     std::unique_ptr<Node> read_node_with_logging(page_num_t pos);
     void _read();
