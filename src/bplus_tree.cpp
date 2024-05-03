@@ -1,4 +1,5 @@
 #include <cstring>
+#include <algorithm>
 
 #include "bplus_tree.hpp"
 
@@ -33,7 +34,6 @@ BPlusTree::BPlusTree(const std::string &file_path, bool reset)
     this->mid_data = max_data >> 1;
     this->half_index = (max_index - 1) >> 1;
     this->half_data = (max_data - 1) >> 1;
-    this->cache = std::unordered_map<page_num_t, std::unique_ptr<Node>>();
     this->to_write = std::unordered_set<page_num_t>();
     this->cost_time = 0;
 }
@@ -65,19 +65,26 @@ void BPlusTree::insert(key_t k, value_t v)
         write_node(root_node);
     }
     auto node = _search(k);
-    size_t i = 0;
-    for (; i < node->keys.size(); ++i)
+    size_t i = std::lower_bound(node->keys.begin(), node->keys.end(), k) - node->keys.begin();
+    if (i < node->keys.size() && node->keys[i] == k)
     {
-        if (k < node->keys[i])
-        {
-            break;
-        }
-        if (k == node->keys[i])
-        {
-            node->values[i] = v;
-            return;
-        }
+        node->values[i] = v;
+        write_node(node);
+        return;
     }
+    // size_t i = 0;
+    // for (; i < node->keys.size(); ++i)
+    // {
+    //     if (k < node->keys[i])
+    //     {
+    //         break;
+    //     }
+    //     if (k == node->keys[i])
+    //     {
+    //         node->values[i] = v;
+    //         return;
+    //     }
+    // }
     node->keys.insert(node->keys.begin() + i, k);
     node->values.insert(node->values.begin() + i, v);
     if (node->keys.size() < max_data)
@@ -101,14 +108,20 @@ void BPlusTree::remove(key_t k)
         return;
     }
     auto node = _search(k);
-    size_t i = 0;
-    for (; i < node->keys.size() && k != node->keys[i]; ++i)
-        ;
-    if (i == node->keys.size())
+    size_t i = std::lower_bound(node->keys.begin(), node->keys.end(), k) - node->keys.begin();
+    if (i == node->keys.size() || node->keys[i] != k)
     {
         // 不存在
         return;
     }
+    // size_t i = 0;
+    // for (; i < node->keys.size() && k != node->keys[i]; ++i)
+    //     ;
+    // if (i == node->keys.size())
+    // {
+    //     // 不存在
+    //     return;
+    // }
     node->keys.erase(node->keys.begin() + i);
     node->values.erase(node->values.begin() + i);
     // 如果node就是根节点
@@ -134,9 +147,10 @@ std::unique_ptr<Node> BPlusTree::_search(key_t k)
     auto node = read_node(root);
     while (!node->is_leaf)
     {
-        size_t i = 0;
-        for (; i < node->keys.size() && k >= node->keys[i]; ++i)
-            ;
+        size_t i = std::upper_bound(node->keys.begin(), node->keys.end(), k) - node->keys.begin();
+        // size_t i = 0;
+        // for (; i < node->keys.size() && k >= node->keys[i]; ++i)
+        //     ;
         node = read_node(node->children[i]);
     }
     return node;
@@ -159,9 +173,10 @@ void BPlusTree::_add(page_num_t parent, key_t k, std::unique_ptr<Node> &node, st
     {
         parent_node = read_node(parent);
     }
-    size_t i = 0;
-    for (; i < parent_node->keys.size() && k > parent_node->keys[i]; ++i)
-        ;
+    size_t i = std::lower_bound(parent_node->keys.begin(), parent_node->keys.end(), k) - parent_node->keys.begin();
+    // size_t i = 0;
+    // for (; i < parent_node->keys.size() && k > parent_node->keys[i]; ++i)
+    //     ;
     parent_node->keys.insert(parent_node->keys.begin() + i, k);
     parent_node->children.insert(parent_node->children.begin() + i + 1, new_node->pos);
     new_node->parent = parent_node->pos;
@@ -198,9 +213,10 @@ void BPlusTree::_fix(std::unique_ptr<Node> &node)
 {
     // 修复删除后的叶节点
     auto parent_node = read_node(node->parent);
-    int j = 0;
-    for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
-        ;
+    size_t j = std::lower_bound(parent_node->children.begin(), parent_node->children.end(), node->pos) - parent_node->children.begin();
+    // int j = 0;
+    // for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
+    //     ;
     // 如果key是node第一个键，需要更新parent_node的键
     if (j > 0 && !node->keys.empty())
     {
@@ -292,9 +308,10 @@ void BPlusTree::_merge(std::unique_ptr<Node> &node)
 {
     // 合并非叶节点
     auto parent_node = read_node(node->parent);
-    int j = 0;
-    for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
-        ;
+    size_t j = std::lower_bound(parent_node->children.begin(), parent_node->children.end(), node->pos) - parent_node->children.begin();
+    // int j = 0;
+    // for (; j < parent_node->children.size() && parent_node->children[j] != node->pos; ++j)
+    //     ;
     // 尝试从右兄弟借一个键
     std::unique_ptr<Node> r_sibling = nullptr;
     if (j < parent_node->keys.size())

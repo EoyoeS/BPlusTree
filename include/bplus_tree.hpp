@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <list>
 #include <fstream>
 #include <memory>
 
@@ -47,6 +48,60 @@ struct Node
     }
 };
 
+class LRUCache
+{
+public:
+    std::size_t capacity;
+    std::list<std::pair<page_num_t, std::unique_ptr<Node>>> lru;
+    std::unordered_map<page_num_t, std::list<std::pair<page_num_t, std::unique_ptr<Node>>>::iterator> cache;
+
+    LRUCache(std::size_t capacity) : capacity(capacity) {}
+
+    std::unique_ptr<Node> get(page_num_t key)
+    {
+        auto it = cache.find(key);
+        if (it == cache.end())
+        {
+            return nullptr;
+        }
+        std::unique_ptr<Node> value = std::make_unique<Node>(*it->second->second);
+        lru.emplace_front(key, std::move(it->second->second));
+        lru.erase(it->second);
+        cache.erase(key);
+        cache.emplace(key, lru.begin());
+        return value;
+    }
+
+    page_num_t put(page_num_t key, std::unique_ptr<Node> value)
+    {
+        auto it = cache.find(key);
+        page_num_t ret = 0;
+        if (it != cache.end())
+        {
+            lru.erase(it->second);
+            cache.erase(key);
+        }
+        else if (cache.size() == capacity)
+        {
+            cache.erase(lru.back().first);
+            lru.pop_back();
+        }
+        lru.emplace_front(key, std::move(value));
+        cache.emplace(key, lru.begin());
+        if (cache.size() == capacity)
+        {
+            ret = lru.back().first;
+        }
+        return ret;
+    }
+
+    void clear()
+    {
+        lru.clear();
+        cache.clear();
+    }
+};
+
 class BPlusTree
 {
 public:
@@ -60,9 +115,9 @@ public:
     page_num_t cnt;          // 页号计数
     std::string file_path;   // 文件路径
     std::fstream file;       // 文件流
-    // char _buffer[4 * 1024 * 1024]; // 缓冲区
-    std::unordered_map<page_num_t, std::unique_ptr<Node>> cache; // 缓存
-    std::unordered_set<page_num_t> to_write;                     // 待写入的节点
+    // std::unordered_map<page_num_t, std::unique_ptr<Node>> cache; // 缓存
+    LRUCache cache = LRUCache(200);
+    std::unordered_set<page_num_t> to_write; // 待写入的节点
     double cost_time;
 
     explicit BPlusTree(const std::string &file_path, bool read = false);
@@ -86,4 +141,5 @@ private:
     void _read();
     void _write();
 };
+
 #endif
